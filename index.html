@@ -197,7 +197,7 @@
             <div class="music-info" id="music-info">
                 <img id="cover" src="" alt="音乐封面">
                 <div class="music-details">
-                    <p><strong>音乐名称：</strong><span id="name"></span></p>
+                    <p><strong>音乐名称：</strong><span id="title"></span></p>
                     <p><strong>演唱歌手：</strong><span id="singer"></span></p>
                     <p><strong>音乐专辑：</strong><span id="album"></span></p>
                     <p><strong>音乐品质：</strong><span id="quality"></span></p>
@@ -250,7 +250,7 @@
                     if (data && data.url) {
                         document.getElementById('music-container').style.display = 'block';
                         document.getElementById('cover').src = data.cover;
-                        document.getElementById('name').innerText = data.name;
+                        document.getElementById('title').innerText = data.title;
                         document.getElementById('singer').innerText = data.singer;
                         document.getElementById('album').innerText = data.album;
                         document.getElementById('quality').innerText = data.quality;
