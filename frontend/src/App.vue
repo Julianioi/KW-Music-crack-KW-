@@ -16,18 +16,11 @@
       </div>
 
       <!-- 搜索区域 -->
-      <div class="input-container">
-        <input 
-          type="text" 
-          id="music-id" 
-          v-model="musicId" 
-          placeholder="输入音乐 ID"
-          @keyup.enter="fetchMusic"
-        />
-        <button @click="fetchMusic" :disabled="loading">
-          {{ loading ? '查询中...' : '查询音乐' }}
-        </button>
-      </div>
+      <SearchBar 
+        v-model="musicId" 
+        :loading="loading"
+        @search="fetchMusic"
+      />
 
       <!-- 加载状态 -->
       <div v-if="loading" class="loading">
@@ -58,25 +51,14 @@
           </div>
         </div>
 
-        <!-- 播放器 -->
-        <div class="player">
-          <button class="play-btn" @click="togglePlay">
-            <img :src="isPlaying ? pauseIcon : playIcon" alt="播放按钮" />
-          </button>
-          <div class="progress-container">
-            <span>{{ currentTime }}</span>
-            <div 
-              class="progress-bar-container" 
-              @click="seek($event)"
-            >
-              <div 
-                class="progress-bar" 
-                :style="{ width: progressPercentage + '%' }"
-              ></div>
-            </div>
-            <span>{{ durationTime }}</span>
-          </div>
-        </div>
+        <!-- 播放器组件 -->
+        <MusicPlayer 
+          :audio-src="musicData.url"
+          :is-playing="isPlaying"
+          @play-state-change="handlePlayStateChange"
+          @time-update="handleTimeUpdate"
+          @seek="handleSeek"
+        />
       </div>
 
       <!-- 页脚 -->
@@ -87,22 +69,20 @@
         </p>
       </div>
     </div>
-
-    <!-- 隐藏的 audio 元素 -->
-    <audio 
-      ref="audioPlayer" 
-      @timeupdate="onTimeUpdate"
-      @loadedmetadata="onLoadedMetadata"
-      @ended="onEnded"
-    ></audio>
   </div>
 </template>
 
 <script>
 import { ref, onMounted } from 'vue';
+import SearchBar from './components/SearchBar.vue';
+import MusicPlayer from './components/MusicPlayer.vue';
 
 export default {
   name: 'App',
+  components: {
+    SearchBar,
+    MusicPlayer
+  },
   setup() {
     const apiUrl = ref('https://kuwumusic-adgk.xj1.top');
     const musicId = ref('');
@@ -110,14 +90,6 @@ export default {
     const loading = ref(false);
     const error = ref('');
     const isPlaying = ref(false);
-    const currentTime = ref('00:00');
-    const durationTime = ref('00:00');
-    const progressPercentage = ref(0);
-
-    const playIcon = 'https://img.icons8.com/ios-glyphs/30/ffffff/play--v1.png';
-    const pauseIcon = 'https://img.icons8.com/ios-glyphs/30/ffffff/pause--v1.png';
-
-    const audioPlayer = ref(null);
 
     // 从 localStorage 加载 API 配置
     onMounted(() => {
@@ -146,16 +118,11 @@ export default {
       isPlaying.value = false;
 
       try {
-        const response = await fetch(`${apiUrl.value}?id=${musicId.value}`);
+        const response = await fetch(`${apiUrl.value}?id=${encodeURIComponent(musicId.value)}`);
         const result = await response.json();
 
         if (result.data && result.data.url) {
           musicData.value = result.data;
-          
-          // 设置音频源
-          if (audioPlayer.value) {
-            audioPlayer.value.src = result.data.url;
-          }
         } else {
           error.value = '未找到音乐信息';
         }
@@ -167,59 +134,19 @@ export default {
       }
     };
 
-    // 切换播放/暂停
-    const togglePlay = () => {
-      if (!audioPlayer.value) return;
-
-      if (isPlaying.value) {
-        audioPlayer.value.pause();
-      } else {
-        audioPlayer.value.play().catch(err => {
-          console.error('播放失败:', err);
-          error.value = '播放失败，请检查音频链接是否有效';
-        });
-      }
-      isPlaying.value = !isPlaying.value;
+    // 处理播放状态变化
+    const handlePlayStateChange = (playing) => {
+      isPlaying.value = playing;
     };
 
-    // 更新时间进度
-    const onTimeUpdate = () => {
-      if (audioPlayer.value && audioPlayer.value.duration) {
-        const percentage = (audioPlayer.value.currentTime / audioPlayer.value.duration) * 100;
-        progressPercentage.value = percentage;
-        currentTime.value = formatTime(audioPlayer.value.currentTime);
-      }
+    // 处理时间更新
+    const handleTimeUpdate = ({ current, duration }) => {
+      // 可以在这里添加额外的逻辑
     };
 
-    // 加载元数据后更新总时长
-    const onLoadedMetadata = () => {
-      if (audioPlayer.value) {
-        durationTime.value = formatTime(audioPlayer.value.duration);
-      }
-    };
-
-    // 播放结束
-    const onEnded = () => {
-      isPlaying.value = false;
-      progressPercentage.value = 0;
-      currentTime.value = '00:00';
-    };
-
-    // 格式化时间
-    const formatTime = (seconds) => {
-      const mins = Math.floor(seconds / 60);
-      const secs = Math.floor(seconds % 60);
-      return `${mins < 10 ? '0' + mins : mins}:${secs < 10 ? '0' + secs : secs}`;
-    };
-
-    // 拖动进度条
-    const seek = (event) => {
-      if (!audioPlayer.value || !audioPlayer.value.duration) return;
-
-      const progressBarContainer = event.currentTarget;
-      const clickX = event.clientX - progressBarContainer.getBoundingClientRect().left;
-      const percentage = clickX / progressBarContainer.offsetWidth;
-      audioPlayer.value.currentTime = audioPlayer.value.duration * percentage;
+    // 处理进度条拖动
+    const handleSeek = (time) => {
+      // 由 MusicPlayer 组件内部处理
     };
 
     return {
@@ -229,18 +156,11 @@ export default {
       loading,
       error,
       isPlaying,
-      currentTime,
-      durationTime,
-      progressPercentage,
-      playIcon,
-      pauseIcon,
       saveApiUrl,
       fetchMusic,
-      togglePlay,
-      onTimeUpdate,
-      onLoadedMetadata,
-      onEnded,
-      seek
+      handlePlayStateChange,
+      handleTimeUpdate,
+      handleSeek
     };
   }
 };
@@ -329,41 +249,6 @@ h1 {
   background-color: #5a6268;
 }
 
-.input-container {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 15px;
-}
-
-input[type="text"] {
-  flex-grow: 1;
-  padding: 12px;
-  border: 2px solid #ff9900;
-  border-radius: 10px;
-  font-size: 16px;
-  outline: none;
-}
-
-button {
-  padding: 12px 20px;
-  background-color: #ff9900;
-  border: none;
-  color: white;
-  border-radius: 10px;
-  font-size: 16px;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-}
-
-button:hover:not(:disabled) {
-  background-color: #e68a00;
-}
-
-button:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
-}
-
 /* 加载动画 */
 .loading {
   padding: 20px;
@@ -440,69 +325,6 @@ button:disabled {
 .music-details a:hover {
   color: #e68a00;
   text-decoration: underline;
-}
-
-.player {
-  display: flex;
-  align-items: center;
-  margin-top: 15px;
-  padding: 15px;
-  background-color: #f9f9f9;
-  border-radius: 15px;
-}
-
-.play-btn {
-  background-color: #ff9900;
-  border: none;
-  border-radius: 50%;
-  width: 40px;
-  height: 40px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 12px;
-  flex-shrink: 0;
-  padding: 0;
-}
-
-.play-btn:hover {
-  background-color: #e68a00;
-}
-
-.play-btn img {
-  width: 18px;
-}
-
-.progress-container {
-  display: flex;
-  align-items: center;
-  flex-grow: 1;
-  gap: 10px;
-}
-
-.progress-container span {
-  font-size: 12px;
-  color: #555;
-  min-width: 45px;
-  text-align: center;
-}
-
-.progress-bar-container {
-  flex-grow: 1;
-  height: 8px;
-  background-color: #ddd;
-  border-radius: 4px;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-}
-
-.progress-bar {
-  height: 100%;
-  background-color: #ff9900;
-  border-radius: 4px;
-  transition: width 0.1s linear;
 }
 
 .footer-content {
